@@ -134,8 +134,8 @@
     <ClCompile Include="ThorazinePE.cpp" />
   </ItemGroup>
   <ItemGroup>
-    <ClInclude Include="pe\defines.h" />
-    <ClInclude Include="pe\fnv1a.h" />
+    <ClInclude Include="src\defines.h" />
+    <ClInclude Include="src\fnv1a.h" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">

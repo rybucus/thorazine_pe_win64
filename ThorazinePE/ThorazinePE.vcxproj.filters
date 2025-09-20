@@ -20,10 +20,10 @@
     </ClCompile>
   </ItemGroup>
   <ItemGroup>
-    <ClInclude Include="pe\defines.h">
+    <ClInclude Include="src\defines.h">
       <Filter>Файлы заголовков</Filter>
     </ClInclude>
-    <ClInclude Include="pe\fnv1a.h">
+    <ClInclude Include="src\fnv1a.h">
       <Filter>Файлы заголовков</Filter>
     </ClInclude>
   </ItemGroup>
