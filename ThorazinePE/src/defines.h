@@ -10,6 +10,8 @@
 		#include <string>
 		#include <algorithm>
 		#include <functional>
+		#include <span>
+		#include <string_view>
 
 		#include "fnv1a.h"
 	#define WIN32_LEAN_AND_MEAN
