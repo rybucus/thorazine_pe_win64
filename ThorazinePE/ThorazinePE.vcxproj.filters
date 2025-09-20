@@ -15,7 +15,7 @@
     </Filter>
   </ItemGroup>
   <ItemGroup>
-    <ClCompile Include="ThorazinePE.cpp">
+    <ClCompile Include="thorazine_pe_win64.cpp">
       <Filter>Исходные файлы</Filter>
     </ClCompile>
   </ItemGroup>
