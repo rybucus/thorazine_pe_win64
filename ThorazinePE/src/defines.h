@@ -39,8 +39,8 @@
 
 #define NT_CALL __stdcall
 
-#define library( str )   pe::module_t{ FNV( #str ) }
-#define import( m, e ) (*pe::module_t{ FNV( #m ) }.exports( ).find( FNV( #e ) )).address
+#define library( str ) pe::module_t{ FNV( #str ) }
+#define import( m, e ) pe::exported_symbol( FNV( #e ), FNV( #m ) ).address( )
 
 namespace pe
 { 
@@ -55,6 +55,7 @@ namespace pe
 	using nt_status = long;
 
 	class  address_t;
+	class  exported_symbol_t;
 	struct list_entry_t;
 	struct peb_ldr_data_t;
 	struct unicode_string_t;
@@ -86,6 +87,8 @@ namespace pe
 		auto offset = reinterpret_cast< std::uintptr_t >( &( reinterpret_cast< T* >( 0 )->*field ) );
 		return reinterpret_cast< T* >( reinterpret_cast< std::uintptr_t >( address ) - offset );
 	}
+
+	__forceinline auto exported_symbol( std::uint64_t export_name, std::uint64_t module_name = 0 );
 
 	enum class e_nt_product_t : std::int32_t
 	{
@@ -216,6 +219,11 @@ namespace pe
 		__forceinline constexpr explicit operator bool( ) const noexcept
 		{
 			return static_cast< bool >( m_address );
+		}
+
+		__forceinline constexpr auto operator==( const address_t& rhs ) const noexcept
+		{
+			return this->m_address == rhs.m_address;
 		}
 
 		__forceinline constexpr address_t operator+=( const address_t& rhs ) noexcept
@@ -1292,6 +1300,11 @@ namespace pe
 			return fnv::hash_runtime( name.c_str( ), name.size( ) ) == module_name_hash;
 		}
 
+		__forceinline bool operator!=( std::uint64_t module_name_hash ) const noexcept
+		{
+			return !operator==( module_name_hash );
+		}
+
 		__forceinline explicit operator bool( ) const noexcept
 		{
 			return present( );
@@ -1314,6 +1327,12 @@ namespace pe
 			auto base_entry = &pe::current_peb( )->ldr->in_load_order_links;
 			this->m_begin   = base_entry->flink;
 			this->m_end     = base_entry;
+		}
+
+		__forceinline modules_t& load_next( )
+		{
+			m_begin = m_begin->flink;
+			return *this;
 		}
 
 		class iterator
@@ -1454,6 +1473,94 @@ namespace pe
  
 	};
 
+	class exported_symbol_t
+	{
+	public:
+
+		__forceinline constexpr exported_symbol_t( ) = default;
+
+		explicit exported_symbol_t( std::uint64_t export_name, std::uint64_t module_hash = 0 ) noexcept
+			: m_data( resolve_export_address( export_name, module_hash ) )
+		{ }
+
+		exported_symbol_t( const exported_symbol_t& instance ) = default;
+		exported_symbol_t( exported_symbol_t&& instance ) = default;
+		exported_symbol_t& operator=( const exported_symbol_t& instance ) = default;
+		exported_symbol_t& operator=( exported_symbol_t&& instance ) = default;
+		~exported_symbol_t( ) = default;
+
+		__forceinline auto address( ) const noexcept
+		{
+			return m_data.m_address;
+		}
+
+		__forceinline auto location( ) const noexcept
+		{
+			return m_data.m_base_dll;
+		}
+
+		__forceinline auto present( ) const noexcept
+		{
+			return static_cast< bool >( m_data.m_address );
+		}
+
+		__forceinline bool operator==( address_t other ) const noexcept
+		{
+			return m_data.m_address == other;
+		}
+
+		__forceinline explicit operator bool( ) const noexcept
+		{
+			return present( );
+		}
+
+		__forceinline explicit operator address_t( ) const noexcept
+		{
+			return address( );
+		}
+
+	private:
+
+		struct full_export_data_t
+		{
+			address_t    m_address{ };
+			pe::module_t m_base_dll{ };
+		};
+
+		__forceinline full_export_data_t resolve_export_address( std::uint64_t export_name, std::uint64_t module_hash ) const noexcept
+		{
+			if ( export_name == 0 )
+				return {};
+
+			const auto process_modules = modules_t{ }.load_next( );
+			const bool is_module_specified = module_hash != 0;
+
+			for ( const auto& module : process_modules )
+			{
+				if ( is_module_specified && module != module_hash )
+					continue;
+
+				exports_t exports{ module.base_address( ) };
+
+				const auto predicate_by_name = [ export_name ]( const pe::export_t& data ) -> bool
+				{
+					return export_name == fnv::hash_runtime( data.name.data( ) );
+				};
+
+				if ( auto export_it = exports.find_if( predicate_by_name ); export_it != exports.end( ) )
+				{
+					const auto& export_data = *export_it;
+					return { export_data.address, module };
+				}
+			}
+
+			return { };
+		}
+
+		full_export_data_t m_data{ };
+
+	};
+
 	constexpr bool pe::nt_success( const nt_status s )
 	{
 		return s >= 0;
@@ -1486,6 +1593,11 @@ namespace pe
 		std::string out_str( size_needed, 0 );
 		WideCharToMultiByte( CP_UTF8, 0, &wstr[ 0 ], std::int32_t( wstr.size( ) ), &out_str[ 0 ], size_needed, nullptr, nullptr );
 		return out_str;
+	}
+
+	auto exported_symbol( std::uint64_t export_name, std::uint64_t module_name )
+	{
+		return ::pe::exported_symbol_t( export_name, module_name );
 	}
 
 	module_t pe::module_t::find( std::uint64_t module_hash ) const
