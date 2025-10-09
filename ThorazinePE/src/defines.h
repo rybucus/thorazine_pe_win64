@@ -81,7 +81,7 @@ namespace thorazine
 		__forceinline std::string utf8_encode ( const std::wstring& wstr );
 
 		template < typename T = std::uint32_t >
-		__forceinline std::uint32_t rva_to_ptr( std::uint32_t rva, nt_headers_t* nt_headers = nullptr, bool mapped_in_memory = false );
+		__forceinline T rva_2_offset( std::uint32_t rva, nt_headers_t* nt_headers = nullptr, bool mapped_in_memory = false );
 
 		template <typename T, typename FieldT>
 		__forceinline constexpr T* containing_record( FieldT* address, FieldT T::* field )
@@ -116,6 +116,22 @@ namespace thorazine
 			xbox = 0x000E,
 			windows_boot_application = 0x0010,
 			xbox_code_catalog = 0x0011,
+		};
+
+		enum class e_section_inherit : DWORD
+		{
+			VIEW_SHARE = 1,
+			VIEW_UNMAP = 2
+		};
+
+		enum class e_section_alloc_attributes : ULONG
+		{
+			SECTION_COMMIT = SEC_COMMIT,
+			SECTION_IMAGE = SEC_IMAGE,
+			SECTION_IMAGE_NO_EXECUTE = SEC_IMAGE_NO_EXECUTE,
+			SECTION_LARGE_PAGES = SEC_LARGE_PAGES,
+			SECTION_NO_CHANGE = 0x00400000,
+			SECTION_RESERVE = SEC_RESERVE,
 		};
 
 		enum e_directory_id : std::uint8_t
@@ -817,12 +833,12 @@ namespace thorazine
 
 			__forceinline auto rva_table( address_t base_address, nt_headers_t* nt_headers = nullptr, bool mapped = false ) const
 			{
-				return base_address.ptr< std::uint32_t >( rva_to_ptr( rva_functions, nt_headers, mapped ) );
+				return base_address.ptr< std::uint32_t >( rva_2_offset( rva_functions, nt_headers, mapped ) );
 			}
 
 			__forceinline auto ordinal_table( address_t base_address, nt_headers_t* nt_headers = nullptr, bool mapped = false ) const
 			{
-				return base_address.ptr< std::uint16_t >( rva_to_ptr( rva_name_ordinals, nt_headers, mapped ) );
+				return base_address.ptr< std::uint16_t >( rva_2_offset( rva_name_ordinals, nt_headers, mapped ) );
 			}
 		};
 
@@ -1027,32 +1043,31 @@ namespace thorazine
 				if ( ! m_export_dir->rva_names )
 					return std::string_view{ };
 
-				const auto rva_names_ptr = m_module_base.offset( rva_to_ptr( m_export_dir->rva_names, m_module_base.ptr< image_t >( )->get_nt_headers( ), m_mapped ) ).as< const uint32_t* >( );
-				auto str = m_module_base.ptr< const char >( rva_to_ptr( rva_names_ptr[ index ], m_module_base.ptr< image_t >( )->get_nt_headers( ), m_mapped ) );
+				const auto rva_names_ptr = m_module_base.offset( rva_2_offset( m_export_dir->rva_names, m_module_base.ptr< image_t >( )->get_nt_headers( ), m_mapped ) ).as< const uint32_t* >( );
+				auto str = m_module_base.ptr< const char >( rva_2_offset( rva_names_ptr[ index ], m_module_base.ptr< image_t >( )->get_nt_headers( ), m_mapped ) );
 				return std::string_view{ str };
 			}
 
 			__forceinline auto ordinal( std::size_t index ) const noexcept
 			{
-				if ( ! m_export_dir->rva_name_ordinals )
-					return std::uint32_t{ };
+				const auto rva_table_ptr     = reinterpret_cast< std::uint32_t* >( m_module_base.raw( ) + pe::rva_2_offset( m_export_dir->rva_functions, m_module_base.ptr< image_t >( )->get_nt_headers( ), m_mapped ) );
+				const auto ordinal_table_ptr = reinterpret_cast< std::uint16_t* >( m_module_base.raw( ) + pe::rva_2_offset( m_export_dir->rva_name_ordinals, m_module_base.ptr< image_t >( )->get_nt_headers( ), m_mapped ) );
 
-				const auto ordinal_table_ptr = m_export_dir->ordinal_table( m_module_base );
-				return static_cast< std::uint32_t >( m_export_dir->base + rva_to_ptr( ordinal_table_ptr[ index ], m_module_base.ptr< image_t >( )->get_nt_headers( ), m_mapped ) );
+				const auto ordinal = ordinal_table_ptr[ index ];
+				const auto rva_function = rva_table_ptr[ ordinal ];
+
+				return pe::rva_2_offset( rva_function, m_module_base.ptr< image_t >( )->get_nt_headers( ), m_mapped );
 			}
 
 			__forceinline auto address( std::size_t index ) const noexcept
 			{
-				if ( ! m_export_dir->rva_functions || ! m_export_dir->rva_name_ordinals )
-					return address_t{ };
-
-				const auto rva_table_ptr     = m_export_dir->rva_table( m_module_base );
-				const auto ordinal_table_ptr = m_export_dir->ordinal_table( m_module_base );
+				const auto rva_table_ptr = reinterpret_cast< std::uint32_t* >( m_module_base.raw( ) + pe::rva_2_offset( m_export_dir->rva_functions, m_module_base.ptr< image_t >( )->get_nt_headers( ), m_mapped ) );
+				const auto ordinal_table_ptr = reinterpret_cast< std::uint16_t* >( m_module_base.raw( ) + pe::rva_2_offset( m_export_dir->rva_name_ordinals, m_module_base.ptr< image_t >( )->get_nt_headers( ), m_mapped ) );
 
 				const auto ordinal      = ordinal_table_ptr[ index ];
 				const auto rva_function = rva_table_ptr[ ordinal ];
 
-				return m_module_base.offset( rva_to_ptr( rva_function, m_module_base.ptr< image_t >( )->get_nt_headers( ), m_mapped ) );
+				return m_module_base.offset( pe::rva_2_offset( rva_function, m_module_base.ptr< image_t >( )->get_nt_headers( ), m_mapped ) );
 			}
 
 			class iterator
@@ -1215,7 +1230,7 @@ namespace thorazine
 				const auto image = base_address.ptr< image_t >( );
 				const auto export_data_dir =
 					image->get_optional_header( )->data_directories.export_directory;
-				return m_module_base.offset< export_directory_t* >( rva_to_ptr( export_data_dir.rva, image->get_nt_headers( ), mapped ) );
+				return m_module_base.offset< export_directory_t* >( rva_2_offset( export_data_dir.rva, image->get_nt_headers( ), mapped ) );
 			}
 
 			address_t           m_module_base;
@@ -1616,19 +1631,25 @@ namespace thorazine
 		}
 
 		template< typename T >
-		std::uint32_t rva_to_ptr( std::uint32_t rva, nt_headers_t* nt_headers, bool mapped_in_memory )
+		T rva_2_offset( std::uint32_t rva, nt_headers_t* nt_headers, bool mapped_in_memory )
 		{
 			if ( !rva || !nt_headers || !mapped_in_memory )
 				return rva;
 
-			auto sec = nt_headers->rva_to_section( rva );
+			auto sec = nt_headers->get_sections( );
 
 			if ( !sec )
 				return rva;
 
-			return rva - sec->virtual_address + sec->ptr_raw_data;
+			for ( std::size_t i = 0; i < nt_headers->file_header.num_sections; i++ )
+			{
+				if ( rva >= sec->virtual_address && rva < sec->virtual_address + sec->virtual_size )
+					break;
+				sec++;
+			}
+
+			return static_cast< T >( rva - sec->virtual_address + sec->ptr_raw_data );
 		}
 	}
 }
 #endif
-
