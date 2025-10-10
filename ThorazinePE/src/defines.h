@@ -1595,7 +1595,7 @@ namespace thorazine
 
 		peb_t* pe::current_peb( )
 		{
-	#ifdef COMPILER_CLANG
+	#if COMPILER_CLANG
 			peb_t* r;
 			__asm__ __volatile__( "movq %%gs:0x60, %0" : "=r"( r ) ); 
 			return r;
