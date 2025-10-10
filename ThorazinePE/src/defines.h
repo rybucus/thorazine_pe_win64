@@ -40,7 +40,8 @@
 #define NT_CALL __stdcall
 
 #define library( str ) ::thorazine::pe::module_t{ FNV( #str ) }
-#define import( m, e ) ::thorazine::pe::exported_symbol( FNV( #e ), FNV( #m ) ).address( )
+#define import_symbol( m, e ) ::thorazine::pe::exported_symbol( FNV( #e ), FNV( #m ) ).address( )
+#define import( m, e ) import_symbol( m, e ).execute
 
 namespace thorazine
 {
