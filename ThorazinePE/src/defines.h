@@ -41,6 +41,7 @@
 
 #define library( str ) ::thorazine::pe::module_t{ FNV( #str ) }
 #define import_symbol( m, e ) ::thorazine::pe::exported_symbol( FNV( #e ), FNV( #m ) ).address( )
+#define import_symbol_crtless( m, e ) ::thorazine::pe::exported_symbol( FNV( #e ), FNV( #m ), true ).address( )
 #define import( m, e ) import_symbol( m, e ).execute
 
 namespace thorazine
@@ -91,7 +92,7 @@ namespace thorazine
 			return reinterpret_cast< T* >( reinterpret_cast< std::uintptr_t >( address ) - offset );
 		}
 
-		__forceinline auto exported_symbol( std::uint64_t export_name, std::uint64_t module_name = 0 );
+		__forceinline auto exported_symbol( std::uint64_t export_name, std::uint64_t module_name = 0, bool crt_less = false );
 
 		enum class e_nt_product_t : std::int32_t
 		{
@@ -1514,8 +1515,8 @@ namespace thorazine
 
 			__forceinline constexpr exported_symbol_t( ) = default;
 
-			explicit exported_symbol_t( std::uint64_t export_name, std::uint64_t module_hash = 0 ) noexcept
-				: m_data( resolve_export_address( export_name, module_hash ) )
+			explicit exported_symbol_t( std::uint64_t export_name, std::uint64_t module_hash = 0, bool no_crt = false ) noexcept
+				: m_data( resolve_export_address( export_name, module_hash, no_crt ) )
 			{ }
 
 			exported_symbol_t( const exported_symbol_t& instance ) = default;
@@ -1562,7 +1563,7 @@ namespace thorazine
 				pe::module_t m_base_dll{ };
 			};
 
-			__forceinline full_export_data_t resolve_export_address( std::uint64_t export_name, std::uint64_t module_hash ) const noexcept
+			__forceinline full_export_data_t resolve_export_address( std::uint64_t export_name, std::uint64_t module_hash, bool no_crt ) const noexcept
 			{
 				if ( export_name == 0 )
 					return {};
@@ -1572,7 +1573,7 @@ namespace thorazine
 
 				for ( const auto& module : process_modules )
 				{
-					if ( is_module_specified && module.name_hashed( ) != module_hash )
+					if ( is_module_specified && ( no_crt ? module.name_hashed( ) != module_hash : module != module_hash ) )
 						continue;
 
 					exports_t exports{ module.base_address( ) };
@@ -1625,9 +1626,9 @@ namespace thorazine
 			return out_str;
 		}
 
-		auto exported_symbol( std::uint64_t export_name, std::uint64_t module_name )
+		auto exported_symbol( std::uint64_t export_name, std::uint64_t module_name, bool crt_less )
 		{
-			return ::thorazine::pe::exported_symbol_t( export_name, module_name );
+			return ::thorazine::pe::exported_symbol_t( export_name, module_name, crt_less );
 		}
 
 		module_t pe::module_t::find( std::uint64_t module_hash ) const
