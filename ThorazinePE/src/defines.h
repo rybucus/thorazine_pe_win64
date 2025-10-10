@@ -1280,6 +1280,23 @@ namespace thorazine
 				return m_data->entry_point;
 			}
 
+			__forceinline auto name_hashed( ) const noexcept
+			{ 
+				auto hash_base = fnv64::hash_init( );
+				char buf[ 4 ];
+				for ( const auto* p = m_data->name.buffer; *p != L'\0'; ++p )
+				{
+					const auto len = ::WideCharToMultiByte( CP_UTF8, 0, p, 1, buf, sizeof( buf ), nullptr, nullptr );
+
+					if ( len <= 0 )
+						continue;
+
+					for ( auto i = 0; i < len; ++i )
+						hash_base = fnv64::hash_byte( hash_base, static_cast< std::uint8_t >( buf[ i ] ) );
+				}
+				return hash_base;
+			}
+
 			__forceinline auto name( ) const noexcept
 			{
 				return m_data == nullptr ? std::string{ } : m_data->name.to_string( );
@@ -1555,21 +1572,16 @@ namespace thorazine
 
 				for ( const auto& module : process_modules )
 				{
-					if ( is_module_specified && module != module_hash )
+					if ( is_module_specified && module.name_hashed( ) != module_hash )
 						continue;
 
 					exports_t exports{ module.base_address( ) };
 
-					const auto predicate_by_name = [ export_name ]( const pe::export_t& data ) -> bool
+					for ( const auto& e : exports )
 					{
-						return export_name == fnv::hash_runtime( data.name.data( ) );
-					};
-
-					if ( auto export_it = exports.find_if( predicate_by_name ); export_it != exports.end( ) )
-					{
-						const auto& export_data = *export_it;
-						return { export_data.address, module };
-					}
+						if ( fnv::hash_runtime( e.name.data( ) ) == export_name )
+							return { e.address, module };
+					} 
 				}
 
 				return { };
