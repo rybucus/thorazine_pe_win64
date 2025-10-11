@@ -317,6 +317,13 @@ namespace thorazine
 			std::uint16_t max_length { 0 };
 			wchar_t*      buffer     { nullptr };
 
+			unicode_string_t( ) = default;
+
+			explicit unicode_string_t( const std::wstring& str )
+				noexcept
+				: length{ static_cast< std::uint16_t >( ( str.size( ) + 1 ) * sizeof( wchar_t ) ) }, max_length{ length }, buffer{ const_cast< wchar_t* >( str.c_str( ) ) }
+			{ }
+
 			__forceinline std::wstring to_wstring( ) const noexcept
 			{
 				return std::wstring{ buffer };
