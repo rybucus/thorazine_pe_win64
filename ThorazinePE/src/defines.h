@@ -157,6 +157,26 @@ namespace thorazine
 			directory_reserved0 = 15,             // -
 		};
 
+		enum e_memory_information
+		{
+			memory_basic_information,                    // q: MEMORY_BASIC_INFORMATION
+			memory_working_set_information,              // q: MEMORY_WORKING_SET_INFORMATION
+			memory_mapped_filename_information,          // q: UNICODE_STRING
+			memory_region_information,                   // q: MEMORY_REGION_INFORMATION
+			memory_working_set_ex_information,           // q: MEMORY_WORKING_SET_EX_INFORMATION // since VISTA
+			memory_shared_commit_information,            // q: MEMORY_SHARED_COMMIT_INFORMATION // since WIN8
+			memory_image_information,                    // q: MEMORY_IMAGE_INFORMATION
+			memory_region_information_ex,                // q: MEMORY_REGION_INFORMATION
+			memory_privileged_basic_information,         // q: MEMORY_BASIC_INFORMATION
+			memory_enclave_image_information,            // q: MEMORY_ENCLAVE_IMAGE_INFORMATION // since REDSTONE3
+			memory_basic_information_capped,             // q: 10
+			memory_physical_contiguity_information,      // q: MEMORY_PHYSICAL_CONTIGUITY_INFORMATION // since 20H1
+			memory_bad_information,                      // q: since WIN11
+			memory_bad_information_all_processes,        // qs: not implemented // since 22H1
+			memory_image_extension_information,          // q: MEMORY_IMAGE_EXTENSION_INFORMATION // since 24H2
+			max_memory_info_class
+		};
+
 		class address_t
 		{
 		public:
