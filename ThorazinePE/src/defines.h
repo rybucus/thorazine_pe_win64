@@ -231,6 +231,14 @@ namespace thorazine
 				return { this->ptr<Ty>( ), count };
 			}
 
+			template < typename Ty = address_t >
+			[[nodiscard]] __forceinline Ty resolve_rip( std::uint32_t rva, std::uint32_t rip ) const noexcept
+			{
+				auto resolved_rva = *reinterpret_cast< std::uint32_t* >( ptr< std::uint8_t >( ) + rva );
+				auto resolved_rip =  reinterpret_cast< std::uint64_t >( ptr< std::uint8_t >( ) ) + rip;
+				return reinterpret_cast< Ty* >( resolved_rva + resolved_rip );
+			}
+
 			__forceinline constexpr explicit operator std::uintptr_t( ) const noexcept
 			{
 				return m_address;
