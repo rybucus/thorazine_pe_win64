@@ -18,7 +18,7 @@
     <ClInclude Include="src\defines.h">
       <Filter>Файлы заголовков</Filter>
     </ClInclude>
-    <ClInclude Include="src\fnv1a.h">
+    <ClInclude Include="src\hash.h">
       <Filter>Файлы заголовков</Filter>
     </ClInclude>
   </ItemGroup>

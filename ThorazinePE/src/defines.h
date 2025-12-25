@@ -12,8 +12,7 @@
 		#include <functional>
 		#include <span>
 		#include <string_view>
-
-		#include "fnv1a.h"
+		#include "hash.h"
 	#define WIN32_LEAN_AND_MEAN
 	#define NO_MIN_MAX
 		#include <windows.h>
@@ -84,10 +83,6 @@ namespace thorazine
 			auto offset = reinterpret_cast< std::uintptr_t >( &( reinterpret_cast< T* >( 0 )->*field ) );
 			return reinterpret_cast< T* >( reinterpret_cast< std::uintptr_t >( address ) - offset );
 		}
-
-		__forceinline auto exported_symbol( std::uint64_t export_name, std::uint64_t module_name = 0, bool crt_less = false );
-
-		__forceinline auto library( std::uint64_t module_name );
 
 		enum class e_nt_product_t : std::int32_t
 		{
@@ -1243,7 +1238,7 @@ namespace thorazine
 					*this, 
 					[ export_name ]( const export_t& data ) -> bool
 					{
-						return export_name == fnv::hash_runtime( data.name.data( ) );
+						return export_name == detail::hash_runtime( data.name );
 					} 
 				);
 
@@ -1313,18 +1308,24 @@ namespace thorazine
 
 			__forceinline auto name_hashed( ) const noexcept
 			{ 
-				auto hash_base = fnv64::hash_init( );
+				auto hash_base = detail::hasher_t::data_t::offset_basis;
 				char buf[ 4 ];
+
 				for ( const auto* p = m_data->name.buffer; *p != L'\0'; ++p )
 				{
-					const auto len = ::WideCharToMultiByte( CP_UTF8, 0, p, 1, buf, sizeof( buf ), nullptr, nullptr );
+					const int len = ::WideCharToMultiByte( CP_UTF8, 0, p, 1, buf, sizeof( buf ), nullptr, nullptr );
 
 					if ( len <= 0 )
+					{
 						continue;
+					}
 
-					for ( auto i = 0; i < len; ++i )
-						hash_base = fnv64::hash_byte( hash_base, static_cast< std::uint8_t >( buf[ i ] ) );
+					for ( int i = 0; i < len; ++i )
+					{
+						hash_base = detail::hasher_t::hash_byte( hash_base, static_cast< std::uint8_t >( buf[ i ] ) );
+					}
 				}
+
 				return hash_base;
 			}
 
@@ -1363,7 +1364,7 @@ namespace thorazine
 				const auto name = this->sanitized_name( );
 				if ( name.size( ) <= 0 )
 					return false;
-				return fnv::hash_runtime( name.c_str( ), name.size( ) ) == module_name_hash;
+				return detail::hash_runtime( name ) == module_name_hash;
 			}
 
 			__forceinline bool operator!=( std::uint64_t module_name_hash ) const noexcept
@@ -1610,7 +1611,7 @@ namespace thorazine
 
 					for ( const auto& e : exports )
 					{
-						if ( fnv::hash_runtime( e.name.data( ) ) == export_name )
+						if ( detail::hash_runtime( e.name ) == export_name )
 							return { e.address, module };
 					} 
 				}
@@ -1656,16 +1657,6 @@ namespace thorazine
 			return out_str;
 		}
 
-		auto exported_symbol( std::uint64_t export_name, std::uint64_t module_name, bool crt_less )
-		{
-			return ::thorazine::pe::exported_symbol_t( export_name, module_name, crt_less );
-		}
-
-		auto library( std::uint64_t module_name )
-		{
-            return ::thorazine::pe::module_t( module_name );
-		}
-
 		module_t pe::module_t::find( std::uint64_t module_hash ) const
 		{
 			modules_t modules { };
@@ -1700,16 +1691,31 @@ namespace thorazine
 			return static_cast< T >( rva - sec->virtual_address + sec->ptr_raw_data );
 		}
 
-		template< typename R = void, typename... Args >
-		__forceinline R call( std::uint64_t export_name, Args&&... args )
+		__forceinline auto import_crtless( detail::hasher_t export_name, detail::hasher_t module_name = { } )
 		{
-			return exported_symbol( export_name ).address( ).execute< R >( std::forward< Args >( args )... );
+			return ::thorazine::pe::exported_symbol_t( export_name.get( ), module_name.get( ), true );
+		}
+
+		__forceinline auto import( detail::hasher_t export_name, detail::hasher_t module_name = { } )
+		{
+            return ::thorazine::pe::exported_symbol_t( export_name.get( ), module_name.get( ) );
+		}
+
+		__forceinline auto library( detail::hasher_t module_name )
+		{
+			return ::thorazine::pe::module_t( module_name.get( ) );
 		}
 
 		template< typename R = void, typename... Args >
-		__forceinline R call( std::uint64_t export_name, std::uint64_t module_name, Args&&... args )
+		__forceinline R call( detail::hasher_t export_name, Args&&... args )
 		{
-			return exported_symbol( export_name, module_name ).address( ).execute< R >( std::forward< Args >( args )... );
+			return import( export_name.get( ) ).address( ).execute< R >( std::forward< Args >( args )... );
+		}
+
+		template< typename R = void, typename... Args >
+		__forceinline R callexp( detail::hasher_t export_name, detail::hasher_t module_name, Args&&... args )
+		{
+			return import( export_name.get( ), module_name.get( ) ).address( ).execute< R >( std::forward< Args >( args )... );
 		}
 	}
 }
