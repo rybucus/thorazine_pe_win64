@@ -70,6 +70,11 @@ public:
         return hash_runtime( str );
     }
 
+    self_t operator( )( const char* str, const std::size_t size ) const
+    {
+        return hash_runtime( str, size );
+    }
+
     template< typename T >
     self_t operator( )( const T& obj ) const
     {
@@ -135,6 +140,16 @@ public:
         return hash;
     }
 
+    static hash_t hash_runtime( const char* str, const std::size_t size )
+    {
+        auto hash = data_t::offset_basis;
+        for ( std::size_t i = 0; i < size; ++i )
+        {
+            hash = hash_byte( hash, str[ i ] );
+        }
+        return hash;
+    }
+
     template< typename T >
     static hash_t hash_runtime( const T& obj )
     {
@@ -151,7 +166,7 @@ private:
 };
 
 using hasher_t = basic_hasher_t< sizeof( void* ) * 8 >;
-using hash_t = hasher_t::hash_t;
+using hash_t   = hasher_t::hash_t;
 
 template <std::size_t N>
 inline consteval hash_t hash( const char( &str )[ N ] ) noexcept
@@ -172,6 +187,11 @@ inline hash_t hash_runtime( const T& obj ) noexcept
 }
 
 inline hash_t hash_runtime( const char* str ) noexcept
+{
+    return hasher_t{ }( str ).get( );
+}
+
+inline hash_t hash_runtime( const char* str, const std::size_t size ) noexcept
 {
     return hasher_t{ }( str ).get( );
 }
