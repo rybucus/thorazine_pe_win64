@@ -193,7 +193,7 @@ inline hash_t hash_runtime( const char* str ) noexcept
 
 inline hash_t hash_runtime( const char* str, const std::size_t size ) noexcept
 {
-    return hasher_t{ }( str ).get( );
+    return hasher_t{ }( str, size ).get( );
 }
 
 } // namespace thorazine::detail
