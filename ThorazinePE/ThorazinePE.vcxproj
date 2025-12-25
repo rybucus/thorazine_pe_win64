@@ -132,9 +132,6 @@
     </Link>
   </ItemDefinitionGroup>
   <ItemGroup>
-    <ClCompile Include="thorazine_pe_win64.cpp" />
-  </ItemGroup>
-  <ItemGroup>
     <ClInclude Include="src\defines.h" />
     <ClInclude Include="src\fnv1a.h" />
   </ItemGroup>

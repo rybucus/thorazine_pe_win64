@@ -37,13 +37,6 @@
 	#error No available compiler specified
 #endif
 
-#define NT_CALL __stdcall
-
-#define library( str ) ::thorazine::pe::module_t{ FNV( #str ) }
-#define import_symbol( m, e ) ::thorazine::pe::exported_symbol( FNV( #e ), FNV( #m ) ).address( )
-#define import_symbol_crtless( m, e ) ::thorazine::pe::exported_symbol( FNV( #e ), FNV( #m ), true ).address( )
-#define import( m, e ) import_symbol( m, e ).execute
-
 namespace thorazine
 {
 	namespace pe
@@ -93,6 +86,8 @@ namespace thorazine
 		}
 
 		__forceinline auto exported_symbol( std::uint64_t export_name, std::uint64_t module_name = 0, bool crt_less = false );
+
+		__forceinline auto library( std::uint64_t module_name );
 
 		enum class e_nt_product_t : std::int32_t
 		{
@@ -1666,6 +1661,11 @@ namespace thorazine
 			return ::thorazine::pe::exported_symbol_t( export_name, module_name, crt_less );
 		}
 
+		auto library( std::uint64_t module_name )
+		{
+            return ::thorazine::pe::module_t( module_name );
+		}
+
 		module_t pe::module_t::find( std::uint64_t module_hash ) const
 		{
 			modules_t modules { };
@@ -1698,6 +1698,18 @@ namespace thorazine
 			}
 
 			return static_cast< T >( rva - sec->virtual_address + sec->ptr_raw_data );
+		}
+
+		template< typename R = void, typename... Args >
+		__forceinline R call( std::uint64_t export_name, Args&&... args )
+		{
+			return exported_symbol( export_name ).address( ).execute< R >( std::forward< Args >( args )... );
+		}
+
+		template< typename R = void, typename... Args >
+		__forceinline R call( std::uint64_t export_name, std::uint64_t module_name, Args&&... args )
+		{
+			return exported_symbol( export_name, module_name ).address( ).execute< R >( std::forward< Args >( args )... );
 		}
 	}
 }
