@@ -67,15 +67,39 @@ namespace thorazine
 		struct peb_t;
 		struct nt_headers_t;
 
-		__forceinline constexpr bool   nt_success		( const nt_status s );
-		__forceinline constexpr handle current_process	( );
-		__forceinline constexpr handle current_thread	( );
+		__forceinline constexpr bool nt_success( const nt_status s )
+		{
+			return s >= 0;
+		}
 
-		__forceinline peb_t*      current_peb ( );
-		__forceinline std::string utf8_encode ( const std::wstring& wstr );
+		__forceinline constexpr handle current_process( )
+		{
+			return reinterpret_cast< handle >( -1 );
+		}
 
-		template < typename T = std::uint32_t >
-		__forceinline T rva_2_offset( std::uint32_t rva, nt_headers_t* nt_headers = nullptr, bool mapped_in_memory = false );
+		__forceinline constexpr handle current_thread( )
+		{
+			return reinterpret_cast< handle >( -2 );
+		}
+
+		__forceinline peb_t* current_peb( )
+		{
+#if COMPILER_CLANG
+			peb_t* r;
+			__asm__ __volatile__( "movq %%gs:0x60, %0" : "=r"( r ) );
+			return r;
+#else
+			return reinterpret_cast< peb_t* >( __readgsqword( 0x60 ) );
+#endif
+		}
+
+		std::string utf8_encode( const std::wstring& wstr )
+		{
+			const auto size_needed = WideCharToMultiByte( CP_UTF8, 0, &wstr[ 0 ], std::int32_t( wstr.size( ) ), nullptr, 0, nullptr, nullptr );
+			std::string out_str( size_needed, 0 );
+			WideCharToMultiByte( CP_UTF8, 0, &wstr[ 0 ], std::int32_t( wstr.size( ) ), &out_str[ 0 ], size_needed, nullptr, nullptr );
+			return out_str;
+		}
 
 		template <typename T, typename FieldT>
 		__forceinline constexpr T* containing_record( FieldT* address, FieldT T::* field )
@@ -83,6 +107,9 @@ namespace thorazine
 			auto offset = reinterpret_cast< std::uintptr_t >( &( reinterpret_cast< T* >( 0 )->*field ) );
 			return reinterpret_cast< T* >( reinterpret_cast< std::uintptr_t >( address ) - offset );
 		}
+
+		template < typename T = std::uint32_t >
+		__forceinline T rva_2_offset( std::uint32_t rva, nt_headers_t* nt_headers = nullptr, bool mapped_in_memory = false );
 
 		enum class e_nt_product_t : std::int32_t
 		{
@@ -1622,40 +1649,6 @@ namespace thorazine
 			full_export_data_t m_data{ };
 
 		};
-
-		constexpr bool pe::nt_success( const nt_status s )
-		{
-			return s >= 0;
-		}
-
-		constexpr handle pe::current_process( )
-		{
-			return reinterpret_cast< handle >( -1 );
-		}
-
-		constexpr handle pe::current_thread( )
-		{
-			return reinterpret_cast< handle >( -2 );
-		}
-
-		peb_t* pe::current_peb( )
-		{
-	#if COMPILER_CLANG
-			peb_t* r;
-			__asm__ __volatile__( "movq %%gs:0x60, %0" : "=r"( r ) ); 
-			return r;
-	#else
-			return reinterpret_cast< peb_t* >( __readgsqword( 0x60 ) );
-	#endif
-		}
-
-		std::string pe::utf8_encode( const std::wstring& wstr )
-		{
-			const auto size_needed = WideCharToMultiByte( CP_UTF8, 0, &wstr[ 0 ], std::int32_t( wstr.size( ) ), nullptr, 0, nullptr, nullptr );
-			std::string out_str( size_needed, 0 );
-			WideCharToMultiByte( CP_UTF8, 0, &wstr[ 0 ], std::int32_t( wstr.size( ) ), &out_str[ 0 ], size_needed, nullptr, nullptr );
-			return out_str;
-		}
 
 		module_t pe::module_t::find( std::uint64_t module_hash ) const
 		{
