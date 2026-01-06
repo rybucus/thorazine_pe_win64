@@ -1333,26 +1333,23 @@ namespace thorazine
 				return m_data->entry_point;
 			}
 
-			__forceinline auto name_hashed( ) const noexcept
+			__forceinline auto name_hashed_crtless( ) const noexcept
 			{ 
 				auto hash_base = detail::hasher_t::data_t::offset_basis;
 				char buf[ 4 ];
-
 				for ( const auto* p = m_data->name.buffer; *p != L'\0'; ++p )
 				{
-					const int len = ::WideCharToMultiByte( CP_UTF8, 0, p, 1, buf, sizeof( buf ), nullptr, nullptr );
-
-					if ( len <= 0 )
+					if ( const int len = ::WideCharToMultiByte( CP_UTF8, 0, p, 1, buf, sizeof( buf ), nullptr, nullptr );
+						 len > 0 )
 					{
-						continue;
-					}
+						static constexpr auto to_lower = [ ] ( char c ) noexcept -> char { return ( c >= 'A' && c <= 'Z' ) ? static_cast< char >( c + ( 'a' - 'A' ) ) : c; };
 
-					for ( int i = 0; i < len; ++i )
-					{
-						hash_base = detail::hasher_t::hash_byte( hash_base, static_cast< std::uint8_t >( buf[ i ] ) );
+						for ( int i = 0; i < len; ++i )
+						{
+							hash_base = detail::hasher_t::hash_byte( hash_base, static_cast< std::uint8_t >( to_lower( buf[ i ] ) ) );
+						}
 					}
 				}
-
 				return hash_base;
 			}
 
@@ -1631,7 +1628,7 @@ namespace thorazine
 
 				for ( const auto& module : process_modules )
 				{
-					if ( is_module_specified && ( no_crt ? module.name_hashed( ) != module_hash : module != module_hash ) )
+					if ( is_module_specified && ( no_crt ? module.name_hashed_crtless( ) != module_hash : module != module_hash ) )
 						continue;
 
 					exports_t exports{ module.base_address( ) };
